@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+env/
+venv/
+
+# macOS
+.DS_Store
+
+# Secrets and config
+.env
+
+# Unneeded directories
+app/whisper.cpp/
+app/coqui_utils/
