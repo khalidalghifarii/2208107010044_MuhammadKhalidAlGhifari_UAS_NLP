@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL = "gemini-1.5-pro"  
+MODEL = "gemini-2.0-flash"  
 
 # TODO: Ambil API key dari file .env
 # Gunakan os.getenv("NAMA_ENV_VARIABLE") untuk mengambil API Key dari file .env.
