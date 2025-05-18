@@ -35,3 +35,6 @@ voice_chatbot_project/
 
 ## 👨‍💻 Dibuat Untuk
 Proyek UAS mata kuliah *Pemrosesan Bahasa Alami* — Semester Genap 2024/2025.
+
+## 🎥 Demo Aplikasi
+Tonton demo aplikasi pada tautan berikut: [YouTube – Voice Chatbot Demo](https://youtu.be/7pH8LCto-P4)
