@@ -1,11 +1,18 @@
 import os
-import google.generativeai as genai
-from google.generativeai import GenerationConfig
+from google import genai
+from google.genai import types
+from pydantic import TypeAdapter
 from dotenv import load_dotenv
 
-load_dotenv()
+# Path untuk file .env
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ENV_PATH = os.path.join(ROOT_DIR, '.env')
 
-MODEL = "gemini-2.0-flash"  
+# Coba load menggunakan dotenv
+print(f"Loading .env from: {ENV_PATH}")
+load_dotenv(dotenv_path=ENV_PATH)
+
+MODEL = "gemini-2.0-flash"
 
 # TODO: Ambil API key dari file .env
 # Gunakan os.getenv("NAMA_ENV_VARIABLE") untuk mengambil API Key dari file .env.
@@ -40,56 +47,47 @@ If you're unsure about an answer, be honest and say that you don't know.
 # Gunakan types.GenerateContentConfig(system_instruction=...) untuk membuat konfigurasi awal.
 # Jika ingin melihat contoh implementasi, baca dokumentasi resmi Gemini:
 # https://github.com/google-gemini/cookbook/blob/main/quickstarts/Get_started.ipynb
-
-# Konfigurasi API dan Model
-genai.configure(api_key=GOOGLE_API_KEY)
-
-# Membuat konfigurasi generasi
-generation_config = {
-    "temperature": 0.7,
-    "top_p": 0.95,
-    "top_k": 40,
-    "max_output_tokens": 200,
-}
-
-# Inisialisasi model
-model = genai.GenerativeModel(
-    model_name=MODEL,
-    generation_config=generation_config
-)
-
-# Inisialisasi chat session
-chat = model.start_chat(history=[])
+client = genai.Client(api_key=GOOGLE_API_KEY)
+chat_config = types.GenerateContentConfig(system_instruction=system_instruction)
+history_adapter = TypeAdapter(list[types.Content])
 
 # Fungsi untuk menyimpan/memuat riwayat chat
-def save_chat_history(current_chat):
-    # Simplified version - just to maintain functionality
+def export_chat_history(chat) -> str:
+    return history_adapter.dump_json(chat.get_history()).decode("utf-8")
+
+def save_chat_history(chat):
+    json_history = export_chat_history(chat)
     with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as f:
-        f.write(str(current_chat))
+        f.write(json_history)
 
 def load_chat_history():
-    # Simplified to avoid compatibility issues
-    return model.start_chat(history=[])
+    if not os.path.exists(CHAT_HISTORY_FILE):
+        return client.chats.create(model=MODEL, config=chat_config)
+    
+    if os.path.getsize(CHAT_HISTORY_FILE) == 0:
+        return client.chats.create(model=MODEL, config=chat_config)
+
+    with open(CHAT_HISTORY_FILE, "r", encoding="utf-8") as f:
+        json_str = f.read().strip()
+
+    if not json_str:
+        return client.chats.create(model=MODEL, config=chat_config)
+
+    try:
+        history = history_adapter.validate_json(json_str)
+        return client.chats.create(model=MODEL, config=chat_config, history=history)
+    except Exception as e:
+        print(f"[ERROR] Gagal load history chat: {e}")
+        return client.chats.create(model=MODEL, config=chat_config)
+
+# Inisialisasi sesi chat saat aplikasi dimulai
+chat = load_chat_history()
 
 # Kirim prompt ke LLM dan kembalikan respons teks
 def generate_response(prompt: str) -> str:
     try:
-        # Menggunakan model langsung untuk mendapatkan respons
-        response = model.generate_content(
-            prompt,
-            generation_config=generation_config,
-            safety_settings=[
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-            ]
-        )
-        
-        if response.text:
-            return response.text.strip()
-        else:
-            return "Maaf, saya tidak dapat menghasilkan respons untuk pertanyaan tersebut."
+        response = chat.send_message(prompt)
+        save_chat_history(chat)
+        return response.text.strip()
     except Exception as e:
-        print(f"Error generating response: {str(e)}")
         return f"[ERROR] {str(e)}"
